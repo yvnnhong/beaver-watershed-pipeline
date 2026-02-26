@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+env/
+
+# Data files - too large for GitHub
+data/water_quality_ca.csv
+data/beavers_us.csv
+
+# Keep the small joined file for reference
+# data/beaver_water_joined.csv  <- this one is fine to commit (only 260 rows)
+
+# AWS credentials - NEVER commit these
+.aws/
+*.pem
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db

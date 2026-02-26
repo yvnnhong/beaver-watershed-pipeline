@@ -1,0 +1,8 @@
+# Lambda function dependencies
+# these get packaged into a Lambda Layer
+pandas==2.2.0
+numpy==1.26.4
+scikit-learn==1.4.0
+requests==2.31.0
+psycopg2-binary==2.9.9
+boto3==1.34.0
