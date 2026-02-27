@@ -26,3 +26,5 @@ data/beavers_us.csv
 # OS files
 .DS_Store
 Thumbs.db
+
+lambda-layer/

@@ -2,7 +2,6 @@ import json
 import boto3
 import pandas as pd
 import numpy as np
-from sklearn.neighbors import BallTree
 import requests
 import io
 import os
@@ -106,31 +105,34 @@ def fetch_water_quality_data(state_cd='CA'):
 
 def spatial_join(df_beavers, df_water):
     """
-    Match each beaver sighting to its nearest water quality station using BallTree.
-    BallTree gives O(log n) nearest neighbor lookup vs O(n) brute force.
-    Haversine metric is correct for lat/lon coordinates on a sphere.
-    Returns joined DataFrame with beaver sighting + nearest station + distance_km + avg_dissolved_oxygen.
+    Match each beaver sighting to its nearest water quality station using haversine formula.
+    Pure numpy implementation - same result as BallTree for this dataset size.
     """
-    # get unique stations - we have many readings per station but only need unique locations
     df_stations = df_water[['site_name', 'latitude', 'longitude']].drop_duplicates().reset_index(drop=True)
 
-    # BallTree requires coordinates in radians, not degrees
-    station_coords = np.radians(df_stations[['latitude', 'longitude']].values)
-    tree = BallTree(station_coords, metric='haversine')
-
-    beaver_coords = np.radians(df_beavers[['decimalLatitude', 'decimalLongitude']].values)
-
-    # k=1 = find the 1 nearest neighbor (closest station) for each beaver sighting
-    distances, indices = tree.query(beaver_coords, k=1)
-    distances_km = distances * 6371  # convert radians to km (Earth radius = 6371 km)
-
-    # reset_index so row numbers align correctly for the concat
     df_beavers = df_beavers.reset_index(drop=True)
 
-    # indices.flatten() converts 2D [[0],[5]] to 1D [0,5] for iloc indexing
-    nearest_stations = df_stations.iloc[indices.flatten()].reset_index(drop=True)
+    nearest_indices = []
+    nearest_distances = []
 
-    # axis=1 = join side by side (horizontally), axis=0 would stack rows vertically
+    lat2 = np.radians(df_stations['latitude'].values)
+    lon2 = np.radians(df_stations['longitude'].values)
+
+    for _, row in df_beavers.iterrows():
+        lat1 = np.radians(row['decimalLatitude'])
+        lon1 = np.radians(row['decimalLongitude'])
+
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+        distances_km = 2 * 6371 * np.arcsin(np.sqrt(a))
+
+        nearest_idx = np.argmin(distances_km)
+        nearest_indices.append(nearest_idx)
+        nearest_distances.append(distances_km[nearest_idx])
+
+    nearest_stations = df_stations.iloc[nearest_indices].reset_index(drop=True)
+
     df_joined = pd.concat([
         df_beavers,
         nearest_stations.rename(columns={
@@ -138,14 +140,12 @@ def spatial_join(df_beavers, df_water):
             'latitude': 'station_lat',
             'longitude': 'station_lon'
         }),
-        pd.Series(distances_km.flatten(), name='distance_km')
+        pd.Series(nearest_distances, name='distance_km')
     ], axis=1)
 
-    # calculate average dissolved oxygen per station, then merge into joined DataFrame
     avg_do = df_water.groupby('site_name')['dissolved_oxygen'].mean().reset_index()
     avg_do.columns = ['nearest_station', 'avg_dissolved_oxygen']
 
-    # how='left' keeps all beaver rows even if no matching station found
     df_final = df_joined.merge(avg_do, on='nearest_station', how='left')
 
     return df_final
