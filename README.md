@@ -14,6 +14,7 @@ Do areas with beaver activity correlate with healthy dissolved oxygen levels in 
 ---
 
 ## Architecture
+# - EventBridge triggers Lambda every Sunday at 6am UTC for automated weekly refresh
 
 ```
 GBIF API (beaver occurrences) ──┐
