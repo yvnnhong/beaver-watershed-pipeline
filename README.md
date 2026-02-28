@@ -2,7 +2,7 @@
 
 An end-to-end data engineering pipeline that ingests North American beaver occurrence data and USGS dissolved oxygen readings, spatially joins them, and surfaces insights via a deployed Streamlit dashboard.
 
-**Live Dashboard:** [Add Streamlit URL here once deployed]
+**Live Dashboard:** https://beaver-watershed-pipeline.streamlit.app/
 
 ## The Question
 Do areas with beaver activity correlate with healthy dissolved oxygen levels in nearby California waterways?
