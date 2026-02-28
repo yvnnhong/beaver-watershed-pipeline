@@ -209,8 +209,21 @@ def lambda_handler(event, context):
         print(f"Got {len(df_beavers)} beaver records")
 
         print("Fetching water quality data from USGS...")
-        df_water = fetch_water_quality_data(state_cd='CA')
-        print(f"Got {len(df_water)} water quality readings")
+        states = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+                'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+                'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+                'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+                'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']
+        all_water = []
+        for state in states:
+            try:
+                df_state = fetch_water_quality_data(state_cd=state)
+                all_water.append(df_state)
+                print(f"Fetched water quality data for {state}")
+            except Exception as e:
+                print(f"Skipping {state}: {e}")
+        df_water = pd.concat(all_water, ignore_index=True)
+        print(f"Got {len(df_water)} water quality readings across all states")
 
         # run spatial join
         print("Running spatial join...")
