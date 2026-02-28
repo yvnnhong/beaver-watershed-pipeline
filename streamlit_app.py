@@ -38,6 +38,8 @@ def load_data():
         )
         df = pd.read_sql("SELECT * FROM beaver_water_joined", conn)
         conn.close()
+        df = df[df["avg_dissolved_oxygen"] > 0]  # filter out bad values
+        df["year"] = df["year"].astype("Int64").astype(str)
         return df
     except Exception as e:
         st.error(f"❌ Database connection failed: {e}")
@@ -285,33 +287,6 @@ def main():
         )
 
     st.markdown("---")
-
-    # ── Temporal chart ────────────────────────────────────────────────────────
-    if "year" in df.columns and df["year"].notna().any():
-        st.subheader("Beaver Sightings Over Time")
-        year_counts = (
-            df[df["year"].notna()]
-            .groupby("year")
-            .size()
-            .reset_index(name="Sightings")
-        )
-        fig_time = px.area(
-            year_counts,
-            x="year",
-            y="Sightings",
-            labels={"year": "Year"},
-            color_discrete_sequence=["#00B48C"],
-        )
-        fig_time.update_layout(
-            margin=dict(l=0, r=10, t=10, b=10),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(gridcolor="#eee"),
-            yaxis=dict(gridcolor="#eee"),
-            height=250,
-        )
-        st.plotly_chart(fig_time, use_container_width=True)
-        st.markdown("---")
 
     # ── Raw data expander ─────────────────────────────────────────────────────
     with st.expander("📋 View Raw Data"):
