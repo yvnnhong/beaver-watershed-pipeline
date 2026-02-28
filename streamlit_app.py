@@ -104,6 +104,10 @@ st.markdown("""
   td { border-bottom: 1px solid #1a1a1a !important; }
 
   [data-testid="stDataFrame"] { background-color: #111111 !important; }
+  header[data-testid="stHeader"] {
+      background-color: #0d0d0d !important;
+      border-bottom: 1px solid #222 !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
