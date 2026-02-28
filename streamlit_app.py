@@ -219,7 +219,7 @@ def main():
         st.warning("No records match the current filters.")
         return
 
-    # KPI row
+    # KPI row (add test)
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Sightings",    f"{len(df):,}")
     col2.metric("Avg DO",       f"{df['avg_dissolved_oxygen'].mean():.2f}")
