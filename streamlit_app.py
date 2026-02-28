@@ -103,11 +103,10 @@ st.markdown("""
   th { color: #00ff9f !important; border-bottom: 1px solid #2a2a2a !important; }
   td { border-bottom: 1px solid #1a1a1a !important; }
 
-  [data-testid="stDataFrame"] { background-color: #111111 !important; }
-  header[data-testid="stHeader"] {
-      background-color: #0d0d0d !important;
-      border-bottom: 1px solid #222 !important;
-  }
+[data-testid="stDataFrame"] { background-color: #111111 !important; }
+  header[data-testid="stHeader"] { visibility: hidden !important; }
+  #MainMenu { visibility: hidden !important; }
+  footer { visibility: hidden !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -222,11 +221,11 @@ def main():
 
     # KPI row
     col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Total Sightings",         f"{len(df):,}")
-    col2.metric("Avg DO",        f"{df['avg_dissolved_oxygen'].mean():.2f} mg/L")
-    col3.metric("Avg Distance", f"{df['distance_km'].mean():.1f} km")
-    col4.metric("States Represented",      df["state_province"].nunique())
-    col5.metric("Monitoring Stations",     df["nearest_station"].nunique())
+    col1.metric("Sightings",    f"{len(df):,}")
+    col2.metric("Avg DO",       f"{df['avg_dissolved_oxygen'].mean():.2f}")
+    col3.metric("Avg Dist (km)",f"{df['distance_km'].mean():.1f}")
+    col4.metric("States",       df["state_province"].nunique())
+    col5.metric("Stations",     df["nearest_station"].nunique())
 
     st.markdown("---")
 
@@ -358,7 +357,7 @@ def main():
     st.markdown("---")
 
     # Raw data
-    with st.expander("[ View Raw Data ]"):
+    with st.expander("[ View Raw Data ]", expanded=False):
         st.dataframe(
             df.drop(columns=["color"], errors="ignore")
               .sort_values("avg_dissolved_oxygen", ascending=False)
