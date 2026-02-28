@@ -5,6 +5,7 @@ import numpy as np
 import requests
 import io
 import os
+import time
 import psycopg2
 from psycopg2.extras import execute_values
 
@@ -52,6 +53,7 @@ def fetch_beaver_data(limit=43145):
 
         all_records.extend(batch)
         print(f"Fetched {len(all_records)} beaver records so far...")
+        time.sleep(0.5)
 
     df = pd.DataFrame(all_records)
     df = df[['species', 'decimalLatitude', 'decimalLongitude', 'year', 'month', 'day', 'stateProvince', 'country']]
