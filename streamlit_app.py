@@ -45,7 +45,7 @@ st.markdown("""
       letter-spacing: -0.5px;
   }
 
-  p, li, span, label, .stMarkdown {
+  p, li, label, .stMarkdown {
       font-family: 'Source Code Pro', Consolas, monospace !important;
       color: #cccccc !important;
   }
