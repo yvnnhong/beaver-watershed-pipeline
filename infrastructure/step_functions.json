@@ -1,0 +1,68 @@
+{
+  "Comment": "Beaver watershed pipeline — fetches GBIF async download + USGS data, waits for GBIF to be ready, then processes and loads to RDS",
+  "StartAt": "InvokeFetcher",
+  "States": {
+
+    "InvokeFetcher": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "beaver-data-fetcher",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "downloadKey.$": "$.Payload.downloadKey",
+        "usgs_s3_key.$": "$.Payload.usgs_s3_key"
+      },
+      "ResultPath": "$",
+      "Next": "WaitForGBIF"
+    },
+
+    "WaitForGBIF": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Next": "CheckGBIFStatus"
+    },
+
+    "CheckGBIFStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "beaver-check-status",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "downloadUrl.$": "$.Payload.downloadUrl",
+        "downloadKey.$": "$.Payload.downloadKey",
+        "usgs_s3_key.$": "$.Payload.usgs_s3_key"
+      },
+      "ResultPath": "$",
+      "Next": "IsGBIFReady"
+    },
+
+    "IsGBIFReady": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "InvokeProcessor"
+        }
+      ],
+      "Default": "WaitForGBIF"
+    },
+
+    "InvokeProcessor": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "beaver-processor",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$",
+      "End": true
+    }
+
+  }
+}
