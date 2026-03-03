@@ -18,3 +18,150 @@ import requests
 S3_RAW_BUCKET = "beaver-pipeline-raw" #s3 raw bucket means the data in its original unprocessed format e.x. csv or json
 GBIF_DOWNLOAD_URL = "https://api.gbif.org/v1/occurrence/download"
 
+ALL_STATE_CODES = [
+    "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+    "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+    "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+    "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+    "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"
+]
+
+def request_gbif_download(gbif_username: str, gbif_password: str) -> str:
+    """
+    POST to GBIF async download API.
+    Returns downloadKey immediately — GBIF prepares the file in the background.
+    This is the fix for the rate limiting problem: one API call instead of
+    hundreds of paginated requests.
+    """
+    predicate = { #predicate = series of stuff that must evaluate to true for the condition to be true
+        "creator": gbif_username,
+        "notificationAddresses": [],
+        "sendNotification": False,
+        "format": "SIMPLE_CSV",
+        "predicate": {
+            "type": "and",
+            "predicates": [
+                {"type": "equals", "key": "TAXON_KEY", "value": "2439838"},  # Castor canadensis
+                {"type": "equals", "key": "COUNTRY", "value": "US"},
+                {"type": "equals", "key": "HAS_COORDINATE", "value": "true"}
+            ]
+        }
+    }
+
+    response = requests.post(
+        GBIF_DOWNLOAD_URL,
+        json=predicate,
+        auth=(gbif_username, gbif_password),
+        timeout=30
+    )
+    response.raise_for_status()
+
+    download_key: str = response.text.strip().strip('"')
+    print(f"GBIF download requested. Key: {download_key}")
+    return download_key
+
+
+def fetch_usgs_state(state_cd: str) -> list[dict]:
+    """
+    Fetch dissolved oxygen readings for ONE single state from USGS.
+    """
+    url = "https://waterservices.usgs.gov/nwis/dv/"
+    params = {
+        "format": "json",
+        "stateCd": state_cd,
+        "parameterCd": "00300",  # dissolved oxygen
+        "siteType": "ST",
+        "startDT": "2020-01-01",
+        "endDT": "2024-12-31",
+        "siteStatus": "all"
+    }
+    try:
+        response = requests.get(url, params=params, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+
+        sites: list[dict] = []
+        time_series = data.get("value", {}).get("timeSeries", [])
+        for ts in time_series:
+            site_info = ts.get("sourceInfo", {})
+            geo = site_info.get("geoLocation", {}).get("geogLocation", {})
+            values = ts.get("values", [{}])[0].get("value", [])
+
+            do_readings: list[float] = []
+            for v in values:
+                try:
+                    do_readings.append(float(v["value"]))
+                except (ValueError, KeyError):
+                    continue
+
+            if do_readings and geo.get("latitude") and geo.get("longitude"):
+                sites.append({
+                    "station_id": site_info.get("siteCode", [{}])[0].get("value", ""),
+                    "station_name": site_info.get("siteName", ""),
+                    "station_lat": float(geo["latitude"]),
+                    "station_lon": float(geo["longitude"]),
+                    "avg_dissolved_oxygen": sum(do_readings) / len(do_readings),
+                    "state_cd": state_cd
+                })
+        print(f"  {state_cd}: {len(sites)} stations")
+        return sites
+
+    except Exception as e:
+        print(f"  {state_cd}: FAILED — {e}")
+        return []
+    
+def fetch_all_usgs_data() -> list[dict]:
+    """
+    Loop all 50 states and collect USGS dissolved oxygen stations.
+    Returns flat list of all station dicts.
+    """
+    all_stations: list[dict] = []
+    for state_cd in ALL_STATE_CODES:
+        stations = fetch_usgs_state(state_cd)
+        all_stations.extend(stations)
+        time.sleep(0.3)  # be polite to USGS API
+    print(f"Total USGS stations fetched: {len(all_stations)}")
+    return all_stations
+
+def save_to_s3(data: list[dict], key: str) -> None:
+    """Save a Python object as JSON to S3 raw bucket."""
+    s3 = boto3.client("s3")
+    s3.put_object(
+        Bucket=S3_RAW_BUCKET,
+        Key=key,
+        Body=json.dumps(data),
+        ContentType="application/json"
+    )
+    print(f"Saved to s3://{S3_RAW_BUCKET}/{key}")
+
+
+def lambda_handler(event: dict, context: object) -> dict:
+    """
+    Lambda 1: data_fetcher
+
+    1. POST to GBIF async download API → get downloadKey
+    2. Fetch all 50 states of USGS dissolved oxygen data
+    3. Save USGS data to S3
+    4. Return downloadKey so Step Functions can pass it to the poller
+    """
+    gbif_username: str = os.environ["GBIF_USERNAME"]
+    gbif_password: str = os.environ["GBIF_PASSWORD"]
+
+    # Step 1: kick off GBIF async download (returns immediately)
+    download_key: str = request_gbif_download(gbif_username, gbif_password)
+
+    # Step 2: fetch all USGS data while GBIF prepares the file in background
+    print("Fetching USGS data for all 50 states...")
+    usgs_data: list[dict] = fetch_all_usgs_data()
+
+    # Step 3: save USGS data to S3 so Lambda 2 can read it
+    usgs_s3_key: str = "usgs/usgs_dissolved_oxygen_all_states.json"
+    save_to_s3(usgs_data, usgs_s3_key)
+
+    # Step 4: return downloadKey — Step Functions will pass this to check_status Lambda
+    return {
+        "statusCode": 200,
+        "downloadKey": download_key,
+        "usgs_s3_key": usgs_s3_key
+    }
+
