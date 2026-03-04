@@ -16,7 +16,7 @@ import requests
 # This Lambda is the "place the order" step — the actual downloading and processing happens in Lambda 3 once GBIF is ready.
 
 S3_RAW_BUCKET = "beaver-pipeline-raw" #s3 raw bucket means the data in its original unprocessed format e.x. csv or json
-GBIF_DOWNLOAD_URL = "https://api.gbif.org/v1/occurrence/download"
+GBIF_DOWNLOAD_URL = "https://api.gbif.org/v1/occurrence/download/request"
 
 ALL_STATE_CODES = [
     "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
