@@ -23,6 +23,31 @@ from psycopg2.extras import execute_values
 S3_RAW_BUCKET = "beaver-pipeline-raw"
 S3_PROCESSED_BUCKET = "beaver-pipeline-processed"
 
+# Normalize messy GBIF state names to clean versions
+STATE_NAME_MAP = {
+    "Washington State (WA)": "Washington",
+    "Virginia (VA)": "Virginia",
+    "New Jersey (NJ)": "New Jersey",
+    "North Dakota": "North Dakota",
+    "South Dakota": "South Dakota",
+    "Nv": "Nevada",
+    "Ca": "California",
+    "Tx": "Texas",
+    "Or": "Oregon",
+    "Wa": "Washington",
+    "Mt": "Montana",
+    "Id": "Idaho",
+    "Co": "Colorado",
+    "Mn": "Minnesota",
+    "Wi": "Wisconsin",
+    "Mi": "Michigan",
+    "Il": "Illinois",
+    "Oh": "Ohio",
+    "Pa": "Pennsylvania",
+    "Ny": "New York",
+}
+
+
 # ── GBIF ──────────────────────────────────────────────────────────────────────
 
 def download_gbif_zip(download_url: str) -> list[dict]:
@@ -52,7 +77,7 @@ def download_gbif_zip(download_url: str) -> list[dict]:
                         "year": int(row["year"]) if row.get("year") else None,
                         "month": int(row["month"]) if row.get("month") else None,
                         "day": int(row["day"]) if row.get("day") else None,
-                        "state_province": row.get("stateProvince", ""),
+                        "state_province": STATE_NAME_MAP.get(row.get("stateProvince", ""), row.get("stateProvince", "")),
                         "country": row.get("countryCode", "")
                     })
                 except (ValueError, KeyError):
