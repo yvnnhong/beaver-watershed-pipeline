@@ -132,7 +132,7 @@ def dark_layout(fig, height=400):
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=84600)
 def load_data():
     try:
         conn = psycopg2.connect(
