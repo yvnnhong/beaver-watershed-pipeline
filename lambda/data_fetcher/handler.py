@@ -87,12 +87,14 @@ def fetch_usgs_state(state_cd: str) -> list[dict]:
             geo = site_info.get("geoLocation", {}).get("geogLocation", {})
             values = ts.get("values", [{}])[0].get("value", [])
 
-            do_readings: list[float] = []
-            for v in values:
-                try:
-                    do_readings.append(float(v["value"]))
-                except (ValueError, KeyError):
-                    continue
+        do_readings: list[float] = []
+        for v in values:
+            try:
+                reading = float(v["value"])
+                if 0 <= reading <= 20:  # valid DO range in mg/L
+                    do_readings.append(reading)
+            except (ValueError, KeyError):
+                continue
 
             if do_readings and geo.get("latitude") and geo.get("longitude"):
                 sites.append({
