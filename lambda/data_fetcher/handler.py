@@ -80,31 +80,42 @@ def fetch_usgs_state(state_cd: str) -> list[dict]:
         response.raise_for_status()
         data = response.json()
 
-        sites: list[dict] = []
+        sites_dict: dict = {}
         time_series = data.get("value", {}).get("timeSeries", [])
         for ts in time_series:
             site_info = ts.get("sourceInfo", {})
             geo = site_info.get("geoLocation", {}).get("geogLocation", {})
             values = ts.get("values", [{}])[0].get("value", [])
+            station_id = site_info.get("siteCode", [{}])[0].get("value", "")
 
-        do_readings: list[float] = []
-        for v in values:
-            try:
-                reading = float(v["value"])
-                if 0 <= reading <= 20:  # valid DO range in mg/L
-                    do_readings.append(reading)
-            except (ValueError, KeyError):
-                continue
+            do_readings: list[float] = []
+            for v in values:
+                try:
+                    reading = float(v["value"])
+                    if 0 <= reading <= 20:
+                        do_readings.append(reading)
+                except (ValueError, KeyError):
+                    continue
 
             if do_readings and geo.get("latitude") and geo.get("longitude"):
-                sites.append({
-                    "station_id": site_info.get("siteCode", [{}])[0].get("value", ""),
-                    "station_name": site_info.get("siteName", ""),
-                    "station_lat": float(geo["latitude"]),
-                    "station_lon": float(geo["longitude"]),
-                    "avg_dissolved_oxygen": sum(do_readings) / len(do_readings),
-                    "state_cd": state_cd
-                })
+                if station_id not in sites_dict:
+                    sites_dict[station_id] = {
+                        "station_id": station_id,
+                        "station_name": site_info.get("siteName", ""),
+                        "station_lat": float(geo["latitude"]),
+                        "station_lon": float(geo["longitude"]),
+                        "do_readings": do_readings,
+                        "state_cd": state_cd
+                    }
+                else:
+                    # same station appeared again, extend readings
+                    sites_dict[station_id]["do_readings"].extend(do_readings)
+
+        sites: list[dict] = []
+        for s in sites_dict.values():
+            s["avg_dissolved_oxygen"] = sum(s["do_readings"]) / len(s["do_readings"])
+            del s["do_readings"]
+            sites.append(s)
         print(f"  {state_cd}: {len(sites)} stations")
         return sites
 
