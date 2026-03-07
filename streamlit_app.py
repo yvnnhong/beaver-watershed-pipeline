@@ -224,7 +224,6 @@ def main():
     col1.metric("Sightings",    f"{len(df):,}")
     col2.metric("Avg DO",       f"{df['avg_dissolved_oxygen'].mean():.2f}")
     col3.metric("Avg Dist (km)",f"{df['distance_km'].mean():.1f}")
-    col4.metric("States",       df["state_province"].nunique())
     col5.metric("Stations",     df["nearest_station"].nunique())
 
     st.markdown("---")
