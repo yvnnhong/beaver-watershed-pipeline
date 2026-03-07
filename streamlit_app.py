@@ -199,7 +199,7 @@ def main():
         "Exploring whether beaver activity correlates with healthy dissolved oxygen "
         "levels in nearby US waterways.  "
         "Data: **GBIF** (beaver occurrences) + **USGS Water Services** (dissolved oxygen).  "
-        "Pipeline: **AWS Lambda -> S3 -> RDS PostgreSQL**."
+        "Pipeline: **AWS Lambda -> Step Functions -> S3 -> RDS PostgreSQL**."
     )
     st.markdown("---")
 
@@ -373,7 +373,7 @@ def main():
         "Built by Yvonne Hong &nbsp;|&nbsp; "
         "<a href='https://github.com/yvnnhong/beaver-watershed-pipeline' style='color:#00ff9f;'>GitHub</a>"
         " &nbsp;|&nbsp; Data: GBIF + USGS &nbsp;|&nbsp; "
-        "Pipeline: AWS Lambda -> S3 -> RDS PostgreSQL -> Streamlit"
+        "Pipeline: AWS Lambda -> Step Functions -> S3 -> RDS PostgreSQL -> Streamlit"
         "</div>",
         unsafe_allow_html=True,
     )
