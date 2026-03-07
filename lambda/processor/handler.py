@@ -118,12 +118,19 @@ def spatial_join(beaver_records: list[dict], usgs_stations: list[dict]) -> list[
         nearest_idx: int = int(np.argmin(distances))
         nearest_station = usgs_stations[nearest_idx]
 
+        nearest_distance = round(float(distances[nearest_idx]), 3)
+        
+        # skip beavers where nearest station is more than 500km away
+        # these are likely data quality issues e.g. Alaska beaver matched to Florida station
+        if nearest_distance > 500:
+            continue
+
         joined.append({
             **beaver,
             "nearest_station": nearest_station["station_name"],
             "station_lat": nearest_station["station_lat"],
             "station_lon": nearest_station["station_lon"],
-            "distance_km": round(float(distances[nearest_idx]), 3),
+            "distance_km": nearest_distance,
             "avg_dissolved_oxygen": nearest_station["avg_dissolved_oxygen"]
         })
 
