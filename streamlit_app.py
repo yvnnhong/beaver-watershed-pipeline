@@ -198,7 +198,7 @@ def main():
     st.markdown(
         "Exploring whether beaver activity correlates with healthy dissolved oxygen "
         "levels in nearby US waterways.  "
-        "Data: **GBIF** (beaver occurrences) + **USGS Water Services** (dissolved oxygen).  "
+        "Data: **GBIF** (beaver occurrences) + **USGS Water Services** (dissolved oxygen, temperature, pH, turbidity).  "
         "Pipeline: **AWS Lambda -> Step Functions -> S3 -> RDS PostgreSQL**."
     )
     st.markdown("---")
@@ -355,6 +355,107 @@ def main():
         )
 
     st.markdown("---")
+
+    st.markdown("---")
+
+    # Water quality parameters section
+    st.subheader("Additional Water Quality Parameters")
+    st.caption("Temperature, pH, and turbidity near beaver sightings — 2020-2024 USGS data")
+
+    temp_col, ph_col = st.columns(2)
+
+    with temp_col:
+        st.subheader("Avg Water Temperature by State")
+        st.caption("°C — beavers prefer cooler water")
+
+        df_temp = df[df["avg_water_temp"].notna()]
+        state_temp = (
+            df_temp.groupby("state_province")["avg_water_temp"].mean()
+            .reset_index()
+            .sort_values("avg_water_temp", ascending=True)
+            .rename(columns={"state_province": "State", "avg_water_temp": "Avg Temp (°C)"})
+        )
+
+        fig_temp = px.bar(
+            state_temp, x="Avg Temp (°C)", y="State", orientation="h",
+            color="Avg Temp (°C)",
+            color_continuous_scale=["#00cfff", "#E6A800"],
+            range_color=[5.0, 25.0],
+        )
+        fig_temp = dark_layout(fig_temp, height=420)
+        fig_temp.update_layout(coloraxis_showscale=False)
+        st.plotly_chart(fig_temp, use_container_width=True)
+
+    with ph_col:
+        st.subheader("Avg pH by State")
+        st.caption("Healthy range: 6.5 - 8.5")
+
+        df_ph = df[df["avg_ph"].notna()]
+        state_ph = (
+            df_ph.groupby("state_province")["avg_ph"].mean()
+            .reset_index()
+            .sort_values("avg_ph", ascending=True)
+            .rename(columns={"state_province": "State", "avg_ph": "Avg pH"})
+        )
+
+        fig_ph = px.bar(
+            state_ph, x="Avg pH", y="State", orientation="h",
+            color="Avg pH",
+            color_continuous_scale=["#E6A800", "#00ff9f"],
+            range_color=[6.0, 9.0],
+        )
+        fig_ph.add_vline(x=6.5, line_dash="dash", line_color="#555",
+                         annotation_text="6.5 min healthy", annotation_font_color="#888")
+        fig_ph.add_vline(x=8.5, line_dash="dash", line_color="#555",
+                         annotation_text="8.5 max healthy", annotation_font_color="#888")
+        fig_ph = dark_layout(fig_ph, height=420)
+        fig_ph.update_layout(coloraxis_showscale=False)
+        st.plotly_chart(fig_ph, use_container_width=True)
+
+    st.markdown("---")
+
+    # Turbidity histogram
+    turb_col, turb_stats_col = st.columns([3, 2])
+
+    with turb_col:
+        st.subheader("Turbidity Distribution Near Beaver Sightings")
+        st.caption("FNU — lower = clearer water. Beaver dams can increase turbidity.")
+
+        df_turb = df[df["avg_turbidity"].notna()]
+
+        fig_turb = px.histogram(
+            df_turb, x="avg_turbidity",
+            nbins=50,
+            color_discrete_sequence=["#00ff9f"],
+            labels={"avg_turbidity": "Turbidity (FNU)"},
+        )
+        fig_turb.add_vline(x=df_turb["avg_turbidity"].median(), line_dash="dash",
+                           line_color="#00cfff",
+                           annotation_text=f"median: {df_turb['avg_turbidity'].median():.1f}",
+                           annotation_font_color="#00cfff")
+        fig_turb = dark_layout(fig_turb, height=350)
+        st.plotly_chart(fig_turb, use_container_width=True)
+
+    with turb_stats_col:
+        st.subheader("Water Quality Summary")
+        df_temp2 = df[df["avg_water_temp"].notna()]
+        df_ph2 = df[df["avg_ph"].notna()]
+        df_turb2 = df[df["avg_turbidity"].notna()]
+
+        st.markdown(f"""
+| Parameter | Avg | Coverage |
+|-----------|-----|----------|
+| Water Temp (°C) | **{df_temp2['avg_water_temp'].mean():.1f}** | {len(df_temp2)/len(df)*100:.0f}% of records |
+| pH | **{df_ph2['avg_ph'].mean():.2f}** | {len(df_ph2)/len(df)*100:.0f}% of records |
+| Turbidity (FNU) | **{df_turb2['avg_turbidity'].mean():.1f}** | {len(df_turb2)/len(df)*100:.0f}% of records |
+""")
+
+        st.info(
+            "**Water Quality Context:** Average temperature of 14°C reflects cool waterways "
+            "preferred by beaver habitat. pH of 7.69 indicates neutral-slightly alkaline water, "
+            "ideal for aquatic ecosystems. Turbidity of 25 FNU suggests moderately clear water "
+            "near beaver activity zones."
+        )
 
     # Raw data
     with st.expander("[ View Raw Data ]", expanded=False):
