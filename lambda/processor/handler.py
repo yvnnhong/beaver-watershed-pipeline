@@ -156,7 +156,10 @@ def spatial_join(beaver_records: list[dict], usgs_stations: list[dict]) -> list[
             "station_lat": nearest_station["station_lat"],
             "station_lon": nearest_station["station_lon"],
             "distance_km": nearest_distance,
-            "avg_dissolved_oxygen": nearest_station["avg_dissolved_oxygen"]
+            "avg_dissolved_oxygen": nearest_station["avg_dissolved_oxygen"],
+            "avg_water_temp": nearest_station.get("avg_water_temp"),
+            "avg_ph": nearest_station.get("avg_ph"),
+            "avg_turbidity": nearest_station.get("avg_turbidity")
         })
 
     print(f"Spatial join complete: {len(joined)} records joined")
@@ -185,10 +188,23 @@ def load_to_rds(joined_records: list[dict]) -> None:
             r["year"], r["month"], r["day"],
             r["state_province"], r["country"],
             r["nearest_station"], r["station_lat"], r["station_lon"],
-            r["distance_km"], r["avg_dissolved_oxygen"]
+            r["distance_km"], r["avg_dissolved_oxygen"],
+            r.get("avg_water_temp"), r.get("avg_ph"), r.get("avg_turbidity")
         )
         for r in joined_records
     ]
+
+    execute_values(cursor, """
+        INSERT INTO beaver_water_joined (
+            species, decimal_latitude, decimal_longitude,
+            year, month, day,
+            state_province, country,
+            nearest_station, station_lat, station_lon,
+            distance_km, avg_dissolved_oxygen,
+            avg_water_temp, avg_ph, avg_turbidity
+        ) VALUES %s
+        ON CONFLICT DO NOTHING
+    """, rows)
 
     execute_values(cursor, """
         INSERT INTO beaver_water_joined (

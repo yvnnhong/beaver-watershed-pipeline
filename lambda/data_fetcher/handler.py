@@ -69,7 +69,7 @@ def fetch_usgs_state(state_cd: str) -> list[dict]:
     params = {
         "format": "json",
         "stateCd": state_cd,
-        "parameterCd": "00300",  # dissolved oxygen
+        "parameterCd": "00300,00010,00400,63680", # DO, temp, pH, turbidity
         "siteType": "ST",
         "startDT": "2020-01-01",
         "endDT": "2024-12-31",
@@ -82,40 +82,64 @@ def fetch_usgs_state(state_cd: str) -> list[dict]:
 
         sites_dict: dict = {}
         time_series = data.get("value", {}).get("timeSeries", [])
+        sites_dict: dict = {}
+        time_series = data.get("value", {}).get("timeSeries", [])
         for ts in time_series:
             site_info = ts.get("sourceInfo", {})
             geo = site_info.get("geoLocation", {}).get("geogLocation", {})
             values = ts.get("values", [{}])[0].get("value", [])
             station_id = site_info.get("siteCode", [{}])[0].get("value", "")
 
-            do_readings: list[float] = []
+            # figure out which parameter this timeSeries is for
+            param_cd = ts.get("variable", {}).get("variableCode", [{}])[0].get("value", "")
+
+            # valid ranges per parameter
+            valid_ranges = {
+                "00300": (0, 20),    # dissolved oxygen mg/L
+                "00010": (0, 35),    # water temp °C
+                "00400": (0, 14),    # pH
+                "63680": (0, 2000),  # turbidity FNU
+            }
+
+            if param_cd not in valid_ranges:
+                continue
+
+            lo, hi = valid_ranges[param_cd]
+            readings: list[float] = []
             for v in values:
                 try:
                     reading = float(v["value"])
-                    if 0 <= reading <= 20:
-                        do_readings.append(reading)
+                    if lo <= reading <= hi:
+                        readings.append(reading)
                 except (ValueError, KeyError):
                     continue
 
-            if do_readings and geo.get("latitude") and geo.get("longitude"):
+            if readings and geo.get("latitude") and geo.get("longitude"):
                 if station_id not in sites_dict:
                     sites_dict[station_id] = {
                         "station_id": station_id,
                         "station_name": site_info.get("siteName", ""),
                         "station_lat": float(geo["latitude"]),
                         "station_lon": float(geo["longitude"]),
-                        "do_readings": do_readings,
-                        "state_cd": state_cd
+                        "state_cd": state_cd,
+                        "readings": {}
                     }
+                if param_cd not in sites_dict[station_id]["readings"]:
+                    sites_dict[station_id]["readings"][param_cd] = readings
                 else:
-                    # same station appeared again, extend readings
-                    sites_dict[station_id]["do_readings"].extend(do_readings)
+                    sites_dict[station_id]["readings"][param_cd].extend(readings)
 
         sites: list[dict] = []
         for s in sites_dict.values():
-            s["avg_dissolved_oxygen"] = sum(s["do_readings"]) / len(s["do_readings"])
-            del s["do_readings"]
-            sites.append(s)
+            r = s.pop("readings")
+            def avg(lst): return sum(lst) / len(lst) if lst else None
+            s["avg_dissolved_oxygen"] = avg(r.get("00300", []))
+            s["avg_water_temp"]       = avg(r.get("00010", []))
+            s["avg_ph"]               = avg(r.get("00400", []))
+            s["avg_turbidity"]        = avg(r.get("63680", []))
+            # only keep stations that have at least dissolved oxygen
+            if s["avg_dissolved_oxygen"] is not None:
+                sites.append(s)
         print(f"  {state_cd}: {len(sites)} stations")
         return sites
 
