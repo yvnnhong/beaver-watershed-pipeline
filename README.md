@@ -1,6 +1,6 @@
 # Beaver & Watershed Health Pipeline
 
-An end-to-end data engineering pipeline that ingests US beaver occurrence records and USGS dissolved oxygen readings, spatially joins them, and surfaces findings via a deployed Streamlit dashboard.
+End-to-end AWS data engineering pipeline that ingests US beaver occurrence records and USGS water quality readings, spatially joins them, and surfaces findings via a deployed Streamlit dashboard.
 
 **Live Dashboard:** https://beaver-watershed-pipeline.streamlit.app  
 **GitHub:** https://github.com/yvnnhong/beaver-watershed-pipeline
@@ -9,25 +9,52 @@ An end-to-end data engineering pipeline that ingests US beaver occurrence record
 
 ## The Question
 
-Do areas with beaver activity correlate with healthy dissolved oxygen levels in nearby US waterways?
+Do areas with beaver activity correlate with healthy water quality in nearby US waterways?
 
 ---
 
 ## Architecture
-# - EventBridge triggers Lambda every Sunday at 6am UTC for automated weekly refresh
-
 ```
-GBIF API (beaver occurrences) ──┐
-                                ├──► S3 Raw Bucket ──► Lambda (spatial join) ──► S3 Processed Bucket ──► RDS PostgreSQL ──► Streamlit Dashboard
-USGS Water Services API ────────┘
+EventBridge (weekly) ──► Step Functions State Machine
+                              │
+                    ┌─────────▼─────────┐
+                    │  Lambda 1          │
+                    │  data_fetcher      │
+                    │  - POST GBIF async │
+                    │  - Fetch USGS x50  │
+                    │  - Save to S3      │
+                    └─────────┬─────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │  Wait 5 min        │
+                    │  (GBIF preparing   │
+                    │   zip file)        │
+                    └─────────┬─────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │  Lambda 2          │
+                    │  check_status      │
+                    │  - Poll GBIF API   │
+                    │  - Loop if not     │
+                    │    ready           │
+                    └─────────┬─────────┘
+                              │ SUCCEEDED
+                    ┌─────────▼─────────┐
+                    │  Lambda 3          │
+                    │  processor         │
+                    │  - Download zip    │
+                    │  - Spatial join    │
+                    │  - Load to RDS     │
+                    └─────────┬─────────┘
+                              │
+                    ┌─────────▼─────────┐
+                    │  RDS PostgreSQL    │
+                    │  ──► Streamlit     │
+                    └───────────────────┘
 ```
 
-**Data flow:**
-1. GBIF API returns US beaver occurrence records (taxon key 2439838, *Castor canadensis*) with coordinates, date, and state
-2. USGS Water Services API returns dissolved oxygen readings (parameter code 00300) from stream monitoring stations
-3. AWS Lambda runs a numpy haversine spatial join, matching each beaver sighting to its nearest USGS station
-4. Cleaned joined dataset is written to S3 processed bucket and loaded into RDS PostgreSQL
-5. Streamlit dashboard reads from RDS and displays an interactive map, charts, and summary statistics
+**Why Step Functions?**  
+GBIF recommends their async download API for datasets over 12k records. Paginated requests caused Lambda to time out at ~10,200 records. Step Functions coordinates the two-Lambda workflow: Lambda 1 fires the GBIF request and fetches USGS data, Step Functions waits for free while GBIF prepares the file, Lambda 3 processes everything once ready.
 
 ---
 
@@ -35,9 +62,12 @@ USGS Water Services API ────────┘
 
 | Layer | Technology |
 |---|---|
-| Cloud Infrastructure | AWS Lambda, AWS S3, AWS RDS (PostgreSQL) |
-| Pipeline | Python, pandas, numpy, psycopg2 |
-| Spatial Join | Numpy haversine distance (O(n) per sighting) |
+| Orchestration | AWS Step Functions |
+| Compute | AWS Lambda (Python 3.12, x3 functions) |
+| Storage | AWS S3 (raw + processed buckets) |
+| Database | AWS RDS PostgreSQL |
+| Scheduler | AWS EventBridge (every Sunday 6am UTC) |
+| Spatial Join | Numpy haversine (vectorized, O(n) per sighting) |
 | Dashboard | Streamlit, pydeck, Plotly |
 | Data Sources | GBIF Occurrence API, USGS Water Services API |
 | Dependency Packaging | Docker (Linux-compatible Lambda layers) |
@@ -47,52 +77,57 @@ USGS Water Services API ────────┘
 
 ## Key Findings
 
-- **5,100+** US beaver occurrence records across 45 states loaded into RDS
-- **13** USGS stream monitoring stations matched via spatial join
-- **Average distance** from beaver sighting to nearest station: 49.3 km
-- **Dissolved oxygen range** near beaver habitat: 7.3 - 11.3 mg/L (all above 6.0 mg/L healthy threshold)
-- **98.6%** of records show healthy dissolved oxygen levels
-- Weak correlation (0.191) between distance to station and dissolved oxygen, suggesting beavers broadly associate with healthy water rather than specifically proximity to monitoring infrastructure
+- **39,931** US beaver occurrence records across the continental US loaded into RDS
+- **569** USGS stream monitoring stations matched via spatial join (500km max distance cap)
+- **Average distance** from beaver sighting to nearest station: 88.9 km
+- **Dissolved oxygen** near beaver habitat: 2.0 - 14.2 mg/L, avg 9.69 mg/L
+- **99.4%** of records show healthy dissolved oxygen levels (>6.0 mg/L threshold)
+- **Water temperature** avg 14.1°C (98% coverage) — consistent with cool waterway preference
+- **pH** avg 7.69 (74% coverage) — neutral to slightly alkaline, healthy for aquatic ecosystems
+- **Turbidity** avg 25.1 FNU (57% coverage) — moderately clear, right-skewed distribution
+- Weak correlation (0.275) between distance to station and dissolved oxygen
+
+---
+
+## Data Sources
+
+| Source | Parameter | USGS Code |
+|---|---|---|
+| GBIF | Beaver occurrences (Castor canadensis) | taxonKey 2439838 |
+| USGS | Dissolved oxygen | 00300 |
+| USGS | Water temperature | 00010 |
+| USGS | pH | 00400 |
+| USGS | Turbidity | 63680 |
+
+Date range: 2020-2024. 50 US states.
 
 ---
 
 ## Project Structure
-
 ```
 beaver-watershed-pipeline/
 ├── README.md
-├── .gitignore
 ├── requirements.txt
-├── streamlit_app.py              # Streamlit dashboard (deployed on Streamlit Cloud)
+├── streamlit_app.py                  # Streamlit dashboard
 ├── .streamlit/
-│   └── secrets.toml              # RDS credentials (not committed)
+│   └── secrets.toml                  # RDS credentials (not committed)
 ├── notebooks/
-│   └── beaver_data_engineer.ipynb   # Colab prototype and data exploration
+│   └── beaver_data_engineer.ipynb    # Colab prototype
 ├── data/
-│   └── beaver_water_joined.csv      # Joined dataset sample
+│   └── beaver_water_joined.csv       # Sample dataset
 ├── lambda/
-│   ├── handler.py                   # Lambda function (full pipeline)
-│   └── requirements.txt             # Lambda dependencies
+│   ├── old_handler.py                # Original single-Lambda approach (retired)
+│   ├── data_fetcher/
+│   │   └── handler.py                # Lambda 1: GBIF async request + USGS fetch
+│   ├── check_status/
+│   │   └── handler.py                # Lambda 2: GBIF download status polling
+│   └── processor/
+│       └── handler.py                # Lambda 3: spatial join + RDS load
 ├── sql/
-│   └── create_tables.sql            # RDS table definitions
+│   └── create_tables.sql             # RDS table definitions
 └── infrastructure/
-    └── setup_notes.md               # AWS setup notes
-```
-
----
-
-## Running Locally
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Add RDS credentials
-mkdir .streamlit
-# Create .streamlit/secrets.toml with your RDS connection details (see secrets.toml.example)
-
-# Run dashboard
-streamlit run streamlit_app.py
+    ├── step_functions.json           # Step Functions state machine definition
+    └── setup_notes.md                # AWS setup notes
 ```
 
 ---
@@ -101,14 +136,54 @@ streamlit run streamlit_app.py
 
 | Service | Resource | Purpose |
 |---|---|---|
-| S3 | beaver-pipeline-raw | Raw CSV storage (GBIF + USGS data) |
-| S3 | beaver-pipeline-processed | Cleaned joined CSV output |
-| Lambda | beaver-pipeline-lambda | Spatial join pipeline (Python 3.12, 1024MB, 5min timeout) |
-| RDS | beaver-pipeline-db | PostgreSQL database storing final joined dataset |
+| S3 | beaver-pipeline-raw | Raw JSON storage (GBIF + USGS) |
+| S3 | beaver-pipeline-processed | Cleaned joined dataset |
+| Lambda | beaver-data-fetcher | GBIF async request + USGS fetch (1024MB, 15min) |
+| Lambda | beaver-check-status | GBIF status polling (128MB, 30sec) |
+| Lambda | beaver-processor | Spatial join + RDS load (1024MB, 15min) |
+| RDS | beaver-pipeline-db | PostgreSQL storing final joined dataset |
+| Step Functions | beaver-pipeline-state-machine | Pipeline orchestration |
+| EventBridge | beaver-pipeline-weekly | Weekly trigger (Sunday 6am UTC) |
 
 ---
 
-## Data Sources
+## ML Next Steps
 
-- [GBIF](https://www.gbif.org/) - Global Biodiversity Information Facility (beaver occurrences)
-- [USGS Water Services](https://waterservices.usgs.gov/) - National Water Information System (dissolved oxygen)
+The pipeline produces a clean, structured, multi-parameter dataset ready for downstream analysis. Planned extensions:
+
+**1. Extend date range to 2010**  
+Changing `startDT` in `data_fetcher/handler.py` from 2020 to 2010 gives 14 years of water quality history per station — sufficient for trend and anomaly analysis.
+
+**2. Anomaly detection on water quality**  
+With historical baselines established, an Isolation Forest model can flag stations where dissolved oxygen, temperature, or pH deviate significantly from their historical norm. This would automatically surface potential pollution events or habitat degradation upstream of beaver activity.
+```python
+from sklearn.ensemble import IsolationForest
+
+features = ["avg_dissolved_oxygen", "avg_water_temp", "avg_ph", "avg_turbidity"]
+clf = IsolationForest(contamination=0.05, random_state=42)
+df["anomaly"] = clf.fit_predict(df[features].dropna())
+# -1 = anomaly, 1 = normal
+```
+
+**3. Seasonal trend analysis**  
+Year and month columns are already in the schema. With 14 years of data, seasonal decomposition (e.g. STL) can separate long-term trends from seasonal cycles in DO and temperature near beaver habitat.
+
+**4. Predicting water quality from beaver density**  
+Group beaver sightings by watershed, compute beaver density per km², and train a regression model predicting DO or turbidity from density. Tests the core ecological hypothesis directly.
+
+---
+
+## Running Locally
+```bash
+pip install -r requirements.txt
+
+# Create .streamlit/secrets.toml with RDS credentials:
+# [postgres]
+# host = "your-rds-endpoint"
+# port = 5432
+# dbname = "postgres"
+# user = "postgres"
+# password = "your-password"
+
+streamlit run streamlit_app.py
+```
