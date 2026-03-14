@@ -206,17 +206,6 @@ def load_to_rds(joined_records: list[dict]) -> None:
         ON CONFLICT DO NOTHING
     """, rows)
 
-    execute_values(cursor, """
-        INSERT INTO beaver_water_joined (
-            species, decimal_latitude, decimal_longitude,
-            year, month, day,
-            state_province, country,
-            nearest_station, station_lat, station_lon,
-            distance_km, avg_dissolved_oxygen
-        ) VALUES %s
-        ON CONFLICT DO NOTHING
-    """, rows)
-
     conn.commit()
     cursor.close()
     conn.close()
