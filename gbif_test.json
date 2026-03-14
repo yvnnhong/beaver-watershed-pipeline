@@ -1,1 +1,0 @@
-﻿{"creator":"yvonnehong2003","notificationAddresses":[],"sendNotification":false,"format":"SIMPLE_CSV","predicate":{"type":"and","predicates":[{"type":"equals","key":"TAXON_KEY","value":"2439838"},{"type":"equals","key":"COUNTRY","value":"US"},{"type":"equals","key":"HAS_COORDINATE","value":"true"}]}}
