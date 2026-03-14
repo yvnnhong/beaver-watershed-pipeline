@@ -15,7 +15,7 @@
 - **Goal:** 2-3 fully deployed, clickable DE/MLOps portfolio projects with environmental data theme. Beaver pipeline is project #2.
 - **Setup:** Windows laptop, PowerShell, VS Code, Docker Desktop, Miniconda (Python 3.13 local, Python 3.12 for Lambda)
 - **AWS:** ~$150 in credits remaining. Billing alert set at $1. Region: us-east-2 (Ohio)
-- **Personality notes:** Very enthusiastic, pastes full terminal output when debugging, appreciates knowing WHY things work not just HOW, strong math background (connect DE concepts to math when possible), gets stressed when things break repeatedly so reassure her that progress is happening. Competitive programmer. Will build the ML model herself — don't underestimate her.
+- **Personality notes:** Very enthusiastic, pastes full terminal output when debugging, appreciates knowing WHY things work not just HOW, strong math background (connect DE concepts to math when possible), gets stressed when things break repeatedly so reassure her that progress is happening.
 
 ---
 
