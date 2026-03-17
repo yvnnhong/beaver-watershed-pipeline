@@ -72,8 +72,9 @@ def fetch_usgs_state(state_cd: str) -> list[dict]:
         "parameterCd": "00300,00010,00400,63680", # DO, temp, pH, turbidity
         "siteType": "ST",
         "startDT": "2010-01-01",
-        "endDT": "2024-12-31",
+        "endDT": "2025-12-31",
         "siteStatus": "all"
+
     }
     try:
         response = requests.get(url, params=params, timeout=60)
