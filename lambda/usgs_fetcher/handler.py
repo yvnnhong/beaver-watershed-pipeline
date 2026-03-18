@@ -44,7 +44,7 @@ def fetch_usgs_state_chunk(state_cd: str, start_dt: str, end_dt: str) -> dict:
     }
     sites_dict = {}
     try:
-        response = requests.get(url, params=params, timeout=60)
+        response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
 
