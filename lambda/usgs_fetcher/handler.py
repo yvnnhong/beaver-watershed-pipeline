@@ -22,9 +22,7 @@ ALL_STATE_CODES = [
 
 # 3-year chunks covering 2015-2025
 DATE_CHUNKS = [
-    ("2015-01-01", "2017-12-31"),
-    ("2018-01-01", "2020-12-31"),
-    ("2021-01-01", "2025-12-31"),
+    ("2020-01-01", "2025-12-31"),
 ]
 
 def fetch_usgs_state_chunk(state_cd: str, start_dt: str, end_dt: str) -> dict:
@@ -157,7 +155,7 @@ def save_to_s3(data: list[dict], key: str) -> None:
 
 
 def lambda_handler(event: dict, context: object) -> dict:
-    print("Fetching USGS data for all 50 states (2015-2025, 3-year chunks)...")
+    print("Fetching USGS data for all 50 states (2020-2025)...")
     usgs_data: list[dict] = fetch_all_usgs_data()
     usgs_s3_key: str = "usgs/usgs_dissolved_oxygen_all_states.json"
     save_to_s3(usgs_data, usgs_s3_key)
