@@ -1,18 +1,49 @@
 {
-  "Comment": "Beaver watershed pipeline — fetches GBIF async download + USGS data, waits for GBIF to be ready, then processes and loads to RDS",
-  "StartAt": "InvokeFetcher",
+  "Comment": "Beaver watershed pipeline — fetches GBIF async download + USGS data in parallel, waits for GBIF to be ready, then processes and loads to RDS",
+  "StartAt": "FetchInParallel",
   "States": {
 
-    "InvokeFetcher": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {
-        "FunctionName": "beaver-data-fetcher",
-        "Payload.$": "$"
-      },
+    "FetchInParallel": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "InvokeFetcher",
+          "States": {
+            "InvokeFetcher": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "beaver-data-fetcher",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "downloadKey.$": "$.Payload.downloadKey"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "InvokeUSGSFetcher",
+          "States": {
+            "InvokeUSGSFetcher": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "beaver-usgs-fetcher",
+                "Payload.$": "$"
+              },
+              "ResultSelector": {
+                "usgs_s3_key.$": "$.Payload.usgs_s3_key"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
       "ResultSelector": {
-        "downloadKey.$": "$.Payload.downloadKey",
-        "usgs_s3_key.$": "$.Payload.usgs_s3_key"
+        "downloadKey.$": "$[0].downloadKey",
+        "usgs_s3_key.$": "$[1].usgs_s3_key"
       },
       "ResultPath": "$",
       "Next": "WaitForGBIF"
