@@ -157,7 +157,7 @@ def save_to_s3(data: list[dict], key: str) -> None:
 
 
 def lambda_handler(event: dict, context: object) -> dict:
-    print("Fetching USGS data for all 50 states (2010-2025, 3-year chunks)...")
+    print("Fetching USGS data for all 50 states (2015-2025, 3-year chunks)...")
     usgs_data: list[dict] = fetch_all_usgs_data()
     usgs_s3_key: str = "usgs/usgs_dissolved_oxygen_all_states.json"
     save_to_s3(usgs_data, usgs_s3_key)
