@@ -1,5 +1,5 @@
 {
-  "Comment": "Beaver watershed pipeline — fetches GBIF async download + USGS data, waits for GBIF to be ready, then processes and loads to RDS",
+  "Comment": "Beaver watershed pipeline — fetches GBIF async download + USGS data, waits for GBIF to be ready, then processes, loads to RDS, and runs anomaly detection",
   "StartAt": "InvokeFetcher",
   "States": {
 
@@ -58,6 +58,17 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "FunctionName": "beaver-processor",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$",
+      "Next": "InvokeAnomalyDetector"
+    },
+
+    "InvokeAnomalyDetector": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "beaver-anomaly-detector",
         "Payload.$": "$"
       },
       "ResultPath": "$",
