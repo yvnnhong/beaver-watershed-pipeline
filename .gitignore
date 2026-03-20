@@ -28,3 +28,9 @@ data/beavers_us.csv
 Thumbs.db
 
 lambda-layer/
+
+lambda-layer-fixed/
+
+lambda-layer/
+
+*.zip

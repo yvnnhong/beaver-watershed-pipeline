@@ -196,10 +196,10 @@ def do_to_rgb(value, vmin=6.0, vmax=12.0):
 def main():
     st.title("Beaver Watershed Pipeline")
     st.markdown(
-        "Exploring whether beaver activity correlates with healthy dissolved oxygen "
-        "levels in nearby US waterways.  "
-        "Data: **GBIF** (beaver occurrences) + **USGS Water Services** (dissolved oxygen, temperature, pH, turbidity).  "
-        "Pipeline: **AWS Lambda -> Step Functions -> S3 -> RDS PostgreSQL**."
+        "Weekly-automated AWS data pipeline spatially joining **GBIF** beaver sighting records "
+        "with **USGS Water Services** water quality data (dissolved oxygen, temperature, pH, turbidity) "
+        "to identify anomalous monitoring stations near beaver habitat.  "
+        "Pipeline: **AWS Lambda × 4 → Step Functions → S3 → RDS PostgreSQL → Isolation Forest anomaly detection**."
     )
     st.markdown("---")
 
@@ -242,7 +242,7 @@ def main():
 
         with anom_map_col:
             st.subheader("Anomaly Map")
-            st.caption(" Anomalous (Red)  |  Normal (green)")
+            st.caption("Each point = one beaver sighting. Red = anomalous water quality relative to EPA climate region baseline (unusual DO/temp/pH/turbidity combination). Green = normal.")
 
             df_normal["color"]  = [[0, 200, 100, 120]]  * len(df_normal)
             df_anomaly["color"] = [[255, 50, 50, 220]]  * len(df_anomaly)
