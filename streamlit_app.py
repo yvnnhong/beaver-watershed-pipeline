@@ -230,6 +230,110 @@ def main():
 
     st.markdown("---")
 
+    # Anomaly Detection section
+    st.subheader("Isolation Forest Anomaly Detection")
+    st.caption("Records flagged as anomalous (-1) by EPA region-normalized Isolation Forest. Contamination=5%.")
+
+    if "anomaly_score" in df.columns:
+        df_anomaly = df[df["anomaly_score"] == -1].copy()
+        df_normal  = df[df["anomaly_score"] == 1].copy()
+
+        anom_map_col, anom_table_col = st.columns([3, 2])
+
+        with anom_map_col:
+            st.subheader("Anomaly Map")
+            st.caption(" Anomalous (Red)  |  Normal (green)")
+
+            df_normal["color"]  = [[0, 200, 100, 120]]  * len(df_normal)
+            df_anomaly["color"] = [[255, 50, 50, 220]]  * len(df_anomaly)
+            df_map = pd.concat([df_normal, df_anomaly])
+
+            anom_layer = pdk.Layer(
+                "ScatterplotLayer", data=df_map,
+                get_position=["decimal_longitude", "decimal_latitude"],
+                get_color="color", get_radius=8000,
+                pickable=True, opacity=0.9,
+            )
+
+            anom_tooltip = {
+                "html": (
+                    "<b>Anomaly Score:</b> {anomaly_score}<br/>"
+                    "<b>State:</b> {state_province}<br/>"
+                    "<b>DO:</b> {avg_dissolved_oxygen} mg/L<br/>"
+                    "<b>Temp:</b> {avg_water_temp} °C<br/>"
+                    "<b>pH:</b> {avg_ph}<br/>"
+                    "<b>Turbidity:</b> {avg_turbidity} FNU"
+                ),
+                "style": {
+                    "backgroundColor": "#0d0d0d",
+                    "color": "#00ff9f",
+                    "fontSize": "12px",
+                    "padding": "8px",
+                    "borderRadius": "4px",
+                    "border": "1px solid #00ff9f",
+                    "fontFamily": "Consolas, monospace",
+                },
+            }
+
+            st.pydeck_chart(pdk.Deck(
+                layers=[anom_layer],
+                initial_view_state=pdk.ViewState(
+                    latitude=df["decimal_latitude"].mean(),
+                    longitude=df["decimal_longitude"].mean(),
+                    zoom=4, pitch=0,
+                ),
+                tooltip=anom_tooltip,
+                map_style="mapbox://styles/mapbox/dark-v11",
+            ))
+
+        with anom_table_col:
+            st.subheader("Top Anomalous Stations")
+            st.caption("Stations with the most flagged records")
+
+            if len(df_anomaly) > 0:
+                top_anom = (
+                    df_anomaly.groupby("nearest_station")
+                    .agg(
+                        flagged_records=("anomaly_score", "count"),
+                        avg_do=("avg_dissolved_oxygen", "mean"),
+                        avg_temp=("avg_water_temp", "mean"),
+                        avg_ph=("avg_ph", "mean"),
+                        avg_turb=("avg_turbidity", "mean"),
+                        state=("state_province", "first"),
+                    )
+                    .reset_index()
+                    .sort_values("flagged_records", ascending=False)
+                    .head(15)
+                    .rename(columns={
+                        "nearest_station": "Station",
+                        "flagged_records": "Flagged",
+                        "avg_do": "DO",
+                        "avg_temp": "Temp°C",
+                        "avg_ph": "pH",
+                        "avg_turb": "Turb",
+                        "state": "State",
+                    })
+                )
+                top_anom["DO"]     = top_anom["DO"].round(2)
+                top_anom["Temp°C"] = top_anom["Temp°C"].round(1)
+                top_anom["pH"]     = top_anom["pH"].round(2)
+                top_anom["Turb"]   = top_anom["Turb"].round(1)
+                st.dataframe(top_anom, use_container_width=True, height=400)
+
+                st.info(
+                    f"**{len(df_anomaly):,} anomalous records** detected "
+                    f"({len(df_anomaly)/len(df)*100:.1f}% of filtered data). "
+                    "These stations show unusual combinations of water quality parameters "
+                    "relative to their EPA climate region baseline — potential pollution "
+                    "events or habitat degradation worth investigating."
+                )
+            else:
+                st.success("No anomalies detected in current filtered data!")
+    else:
+        st.info("Anomaly scores not yet computed. Run the full pipeline to generate scores.")
+
+    st.markdown("---")
+
     # Map + bar chart
     map_col, bar_col = st.columns([3, 2])
 
@@ -458,109 +562,7 @@ def main():
             "near beaver activity zones."
         )
 
-    st.markdown("---")
 
-    # Anomaly Detection section
-    st.subheader("Isolation Forest Anomaly Detection")
-    st.caption("Records flagged as anomalous (-1) by EPA region-normalized Isolation Forest. Contamination=5%.")
-
-    if "anomaly_score" in df.columns:
-        df_anomaly = df[df["anomaly_score"] == -1].copy()
-        df_normal  = df[df["anomaly_score"] == 1].copy()
-
-        anom_map_col, anom_table_col = st.columns([3, 2])
-
-        with anom_map_col:
-            st.subheader("Anomaly Map")
-            st.caption(" Anomalous (Red)  |  Normal (green)")
-
-            df_normal["color"]  = [[0, 200, 100, 120]]  * len(df_normal)
-            df_anomaly["color"] = [[255, 50, 50, 220]]  * len(df_anomaly)
-            df_map = pd.concat([df_normal, df_anomaly])
-
-            anom_layer = pdk.Layer(
-                "ScatterplotLayer", data=df_map,
-                get_position=["decimal_longitude", "decimal_latitude"],
-                get_color="color", get_radius=8000,
-                pickable=True, opacity=0.9,
-            )
-
-            anom_tooltip = {
-                "html": (
-                    "<b>Anomaly Score:</b> {anomaly_score}<br/>"
-                    "<b>State:</b> {state_province}<br/>"
-                    "<b>DO:</b> {avg_dissolved_oxygen} mg/L<br/>"
-                    "<b>Temp:</b> {avg_water_temp} °C<br/>"
-                    "<b>pH:</b> {avg_ph}<br/>"
-                    "<b>Turbidity:</b> {avg_turbidity} FNU"
-                ),
-                "style": {
-                    "backgroundColor": "#0d0d0d",
-                    "color": "#00ff9f",
-                    "fontSize": "12px",
-                    "padding": "8px",
-                    "borderRadius": "4px",
-                    "border": "1px solid #00ff9f",
-                    "fontFamily": "Consolas, monospace",
-                },
-            }
-
-            st.pydeck_chart(pdk.Deck(
-                layers=[anom_layer],
-                initial_view_state=pdk.ViewState(
-                    latitude=df["decimal_latitude"].mean(),
-                    longitude=df["decimal_longitude"].mean(),
-                    zoom=4, pitch=0,
-                ),
-                tooltip=anom_tooltip,
-                map_style="mapbox://styles/mapbox/dark-v11",
-            ))
-
-        with anom_table_col:
-            st.subheader("Top Anomalous Stations")
-            st.caption("Stations with the most flagged records")
-
-            if len(df_anomaly) > 0:
-                top_anom = (
-                    df_anomaly.groupby("nearest_station")
-                    .agg(
-                        flagged_records=("anomaly_score", "count"),
-                        avg_do=("avg_dissolved_oxygen", "mean"),
-                        avg_temp=("avg_water_temp", "mean"),
-                        avg_ph=("avg_ph", "mean"),
-                        avg_turb=("avg_turbidity", "mean"),
-                        state=("state_province", "first"),
-                    )
-                    .reset_index()
-                    .sort_values("flagged_records", ascending=False)
-                    .head(15)
-                    .rename(columns={
-                        "nearest_station": "Station",
-                        "flagged_records": "Flagged",
-                        "avg_do": "DO",
-                        "avg_temp": "Temp°C",
-                        "avg_ph": "pH",
-                        "avg_turb": "Turb",
-                        "state": "State",
-                    })
-                )
-                top_anom["DO"]     = top_anom["DO"].round(2)
-                top_anom["Temp°C"] = top_anom["Temp°C"].round(1)
-                top_anom["pH"]     = top_anom["pH"].round(2)
-                top_anom["Turb"]   = top_anom["Turb"].round(1)
-                st.dataframe(top_anom, use_container_width=True, height=400)
-
-                st.info(
-                    f"**{len(df_anomaly):,} anomalous records** detected "
-                    f"({len(df_anomaly)/len(df)*100:.1f}% of filtered data). "
-                    "These stations show unusual combinations of water quality parameters "
-                    "relative to their EPA climate region baseline — potential pollution "
-                    "events or habitat degradation worth investigating."
-                )
-            else:
-                st.success("No anomalies detected in current filtered data!")
-    else:
-        st.info("Anomaly scores not yet computed. Run the full pipeline to generate scores.")
 
     # Raw data
     with st.expander("[ View Raw Data ]", expanded=False):
