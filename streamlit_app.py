@@ -226,7 +226,8 @@ def main():
     col4.metric("% Healthy DO", f"{(df['avg_dissolved_oxygen'] >= 6.0).mean()*100:.1f}%")
     col5.metric("Stations",     df["nearest_station"].nunique())
     n_anomalies = int((df["anomaly_score"] == -1).sum()) if "anomaly_score" in df.columns else 0
-    col6.metric("Anomalies: ", f"{n_anomalies:,}")
+    anomaly_pct = (n_anomalies / len(df) * 100) if len(df) > 0 else 0
+    col6.metric("Anomaly %", f"{anomaly_pct:.1f}%")
 
     st.markdown("---")
 
