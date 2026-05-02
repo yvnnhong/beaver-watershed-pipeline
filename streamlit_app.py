@@ -142,7 +142,13 @@ def load_data():
             user=st.secrets["postgres"]["user"],
             password=st.secrets["postgres"]["password"],
         )
-        df = pd.read_sql("SELECT * FROM beaver_water_joined", conn)
+        df = pd.read_sql("""
+            SELECT 
+                decimal_latitude, decimal_longitude, state_province, species,
+                avg_dissolved_oxygen, avg_water_temp, avg_ph, avg_turbidity,
+                distance_km, nearest_station, year, anomaly_score
+            FROM beaver_water_joined
+        """, conn)
         conn.close()
         df = df[df["avg_dissolved_oxygen"] > 0]
         df["year"] = df["year"].astype("Int64")
