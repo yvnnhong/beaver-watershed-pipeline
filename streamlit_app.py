@@ -148,6 +148,7 @@ def load_data():
                 avg_dissolved_oxygen, avg_water_temp, avg_ph, avg_turbidity,
                 distance_km, nearest_station, year, anomaly_score
             FROM beaver_water_joined
+            LIMIT 15000
         """, conn)
         conn.close()
         df = df[df["avg_dissolved_oxygen"] > 0]
